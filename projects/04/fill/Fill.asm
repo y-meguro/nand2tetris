@@ -21,13 +21,6 @@
     D=A
     @number_of_pixel
     M=D // number_of_pixel=8192
-
-    @SCREEN // 16384
-    D=A
-    @position
-    M=D // position=16384
-    @count
-    M=0 // i=0
 (LOOP_KBD)
     @KBD
     D=M // D=KBD
@@ -62,19 +55,26 @@
 (SET_BLACK)
     @color
     M=-1 // color=-1
-    @LOOP_FILL
+    @PREPARE_FILL
     0;JMP
 (SET_WHITE)
     @color
     M=0 // color=0
+(PREPARE_FILL)
+    @SCREEN // 16384
+    D=A
+    @position
+    M=D // position=16384
+    @count
+    M=0 // count=0
 (LOOP_FILL)
     // check end
     @count
     D=M // D=count
     @number_of_pixel
     D=M-D // D=number_of_pixel-count
-    @LOOP_KBD
-    0;JLT
+    @FILL_END
+    D;JEQ
 
     // fill a pixel
     @color
@@ -89,4 +89,9 @@
     @count
     M=M+1 // i++
     @LOOP_FILL
+    0;JMP
+(FILL_END)
+    @R1
+    M=0 // R1=0
+    @LOOP_KBD
     0;JMP
