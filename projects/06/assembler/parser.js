@@ -1,14 +1,12 @@
 const fs = require('fs');
 const path = require("path");
 
-const A_COMMAND = 'A_COMMAND';
-const C_COMMAND = 'C_COMMAND';
-const L_COMMAND = 'L_COMMAND';
+const { A_COMMAND, C_COMMAND, L_COMMAND } = require('./constants');
 
 class Parser {
   constructor(filePath) {
     const fileContent = fs.readFileSync(path.resolve(__dirname, filePath), {encoding: "utf-8"});
-    const lines = fileContent.replace(" ", "").split(/\r\n/);
+    const lines = fileContent.replace(/ /g, '').split(/\r\n/);
     this.instructions = lines.filter((line) => {
       return line !== '' && line.indexOf("//") !== 0;
     });
