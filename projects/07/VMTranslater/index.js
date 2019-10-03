@@ -13,6 +13,8 @@ const {
   C_CALL
 } = require('./constants');
 
+// call like "node projects/07/VMTranslater/index.js ../StackArithmetic/StackTest/StackTest.vm"
+// then create "../StackArithmetic/StackTest/StackTest.asm"
 const vmTranslater = () => {
   const filePath = process.argv[2];
   const parser = new Parser(filePath);
