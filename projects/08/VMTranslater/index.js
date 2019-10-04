@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require("path");
+
 const Parser = require('./parser');
 const CodeWriter = require('./codeWriter');
 
@@ -13,12 +16,27 @@ const {
   C_CALL
 } = require('./constants');
 
-// call like "node projects/07/VMTranslater/index.js ../StackArithmetic/StackTest/StackTest.vm"
-// then create "../StackArithmetic/StackTest/StackTest.asm"
+// call like "node projects/08/VMTranslater/index.js ../FunctionCalls/NestedCall"
+// then create "../StackArithmetic/FunctionCalls/NestedCall/NestedCall.asm"
 const vmTranslater = () => {
-  const filePath = process.argv[2];
+  const directoryPath = process.argv[2];
+  const allFiles = fs.readdirSync(path.resolve(__dirname, directoryPath));
+  const files = allFiles.filter((file) => {
+    return file.endsWith('.vm');
+  });
+
+  const index = directoryPath.lastIndexOf('/');
+  const fileName = directoryPath.slice(index) + '.asm';
+  const codeWriter = new CodeWriter(directoryPath + fileName);
+
+  for (const file of files) {
+    const filePath = directoryPath + '/' + file;
+    translate(filePath, codeWriter);
+  }
+};
+
+const translate = (filePath, codeWriter) => {
   const parser = new Parser(filePath);
-  const codeWriter = new CodeWriter(filePath);
 
   while (parser.hasMoreCommands()) {
     if (parser.commandType() === C_ARITHMETIC) {
@@ -50,7 +68,7 @@ const vmTranslater = () => {
     } else if (parser.commandType() === C_CALL) {
       const functionName = parser.arg1();
       const numArgs = Number(parser.arg2());
-      codeWriter.writeFunction(functionName, numArgs);
+      codeWriter.writeCall(functionName, numArgs);
     } else {
       throw new Error('invalid commandType');
     }

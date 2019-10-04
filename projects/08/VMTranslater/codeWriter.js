@@ -14,14 +14,27 @@ const {
 
 class CodeWriter {
   constructor(filePath) {
-    const index = filePath.lastIndexOf('.');
-    this.outputPath = __dirname + '/' + filePath.slice(0, index) + '.asm';
+    this.outputPath = __dirname + '/' + filePath;
     fs.writeFileSync(this.outputPath, '');
 
-    const index2 = this.outputPath.lastIndexOf('/');
-    this.fileName = this.outputPath.slice(index2 + 1);
+    const index = filePath.lastIndexOf('/');
+    const index2 = filePath.lastIndexOf('.');
+    this.fileName = filePath.slice(index + 1, index2);
 
-    this.labelNum = 0;
+    this.labelNumForCompare = 0;
+    this.labelNumForReturnAddress = 0;
+
+    this.writeInit();
+  }
+
+  writeInit() {
+    this.writeCodes([
+      '@256',
+      'D=A',
+      '@SP',
+      'M=D',
+    ]);
+    this.writeCall('Sys.init', 0);
   }
 
   writeArithmetic(command) {
@@ -97,7 +110,56 @@ class CodeWriter {
     ]);
   }
 
-  writeCall(functionName, numArgs) {
+  writeCall(functionName, numArgs=0) {
+    this.writeCodes([
+      `@RETURN_ADDRESS_${this.labelNumForReturnAddress}`,
+      'D=A',
+    ]);
+    this.writePushFromD();
+
+    this.writeCodes([
+      '@LCL',
+      'D=M',
+    ]);
+    this.writePushFromD();
+
+    this.writeCodes([
+      '@ARG',
+      'D=M',
+    ]);
+    this.writePushFromD();
+
+    this.writeCodes([
+      '@THIS',
+      'D=M',
+    ]);
+    this.writePushFromD();
+
+    this.writeCodes([
+      '@THAT',
+      'D=M',
+    ]);
+    this.writePushFromD();
+
+    this.writeCodes([
+      '@SP',
+      'D=M',
+      `@${numArgs}`,
+      'D=D-A',
+      `@5`,
+      'D=D-A',
+      '@ARG',
+      'M=D', // ARG = SP - numArgs - 5
+      '@SP',
+      'D=M',
+      '@LCL',
+      'M=D', // LCL = SP
+      `@${functionName}`,
+      '0;JMP',
+      `(RETURN_ADDRESS_${this.labelNumForReturnAddress})`,
+    ]);
+
+    this.labelNumForReturnAddress = this.labelNumForReturnAddress + 1;
   }
 
   writeReturn() {
@@ -121,8 +183,9 @@ class CodeWriter {
       '@ARG',
       'A=M',
       'M=D', // *ARG = pop()
-      'A=A+1',
-      'D=A',
+
+      '@ARG',
+      'D=M+1',
       '@SP',
       'M=D', // SP = ARG + 1
 
@@ -156,7 +219,7 @@ class CodeWriter {
     ]);
   }
 
-  writeFunction(functionName, numLocals) {
+  writeFunction(functionName, numLocals=0) {
     this.writeCodes([
       `(${functionName})`,
       'D=0'
@@ -243,18 +306,18 @@ class CodeWriter {
     this.writePopToA();
     this.writeCodes([
       'D=M-D',
-      `@RETURN_TRUE_${this.labelNum}`,
+      `@RETURN_TRUE_${this.labelNumForCompare}`,
       `D;${mnemonic}`,
       'D=0',
-      `@NEXT_${this.labelNum}`,
+      `@NEXT_${this.labelNumForCompare}`,
       '0;JMP',
-      `(RETURN_TRUE_${this.labelNum})`,
+      `(RETURN_TRUE_${this.labelNumForCompare})`,
       'D=-1',
-      `(NEXT_${this.labelNum})`
+      `(NEXT_${this.labelNumForCompare})`
     ]);
     this.writePushFromD();
 
-    this.labelNum = this.labelNum + 1;
+    this.labelNumForCompare = this.labelNumForCompare + 1;
   }
 
   getLabelBySegment(segment) {
