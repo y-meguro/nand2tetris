@@ -26,11 +26,11 @@ const vmTranslater = () => {
       codeWriter.writeArithmetic(command);
     } else if (parser.commandType() === C_PUSH) {
       const segment = parser.arg1();
-      const index = parser.arg2();
+      const index = Number(parser.arg2());
       codeWriter.writePushPop(C_PUSH, segment, index);
     } else if (parser.commandType() === C_POP) {
       const segment = parser.arg1();
-      const index = parser.arg2();
+      const index = Number(parser.arg2());
       codeWriter.writePushPop(C_POP, segment, index);
     } else if (parser.commandType() === C_LABEL) {
       const label = parser.arg1();
@@ -41,6 +41,18 @@ const vmTranslater = () => {
     } else if (parser.commandType() === C_IF) {
       const label = parser.arg1();
       codeWriter.writeIf(label);
+    } else if (parser.commandType() === C_FUNCTION) {
+      const functionName = parser.arg1();
+      const numLocals = Number(parser.arg2());
+      codeWriter.writeFunction(functionName, numLocals);
+    } else if (parser.commandType() === C_RETURN) {
+      codeWriter.writeReturn();
+    } else if (parser.commandType() === C_CALL) {
+      const functionName = parser.arg1();
+      const numArgs = Number(parser.arg2());
+      codeWriter.writeFunction(functionName, numArgs);
+    } else {
+      throw new Error('invalid commandType');
     }
     parser.advance();
   }

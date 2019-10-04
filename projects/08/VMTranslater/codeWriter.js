@@ -97,6 +97,75 @@ class CodeWriter {
     ]);
   }
 
+  writeCall(functionName, numArgs) {
+  }
+
+  writeReturn() {
+    this.writeCodes([
+      '@LCL',
+      'D=M',
+      '@R13', // R13にFRAMEを保存
+      'M=D',
+      '@5',
+      'D=A',
+      '@R13',
+      'A=M-D', // FRAME - 5
+      'D=M',
+      '@R14', // R14にRETを保存
+      'M=D'
+    ]);
+
+    this.writePopToA();
+    this.writeCodes([
+      'D=M',
+      '@ARG',
+      'A=M',
+      'M=D', // *ARG = pop()
+      'A=A+1',
+      'D=A',
+      '@SP',
+      'M=D', // SP = ARG + 1
+
+      '@R13',
+      'AM=M-1',
+      'D=M',
+      '@THAT',
+      'M=D', // THAT = *(FRAME - 1)
+
+      '@R13',
+      'AM=M-1',
+      'D=M',
+      '@THIS',
+      'M=D', // THIS = *(FRAME - 2)
+
+      '@R13',
+      'AM=M-1',
+      'D=M',
+      '@ARG',
+      'M=D', // ARG = *(FRAME - 3)
+
+      '@R13',
+      'AM=M-1',
+      'D=M',
+      '@LCL',
+      'M=D', // LCL = *(FRAME - 4)
+
+      '@R14',
+      'A=M',
+      '0;JMP'
+    ]);
+  }
+
+  writeFunction(functionName, numLocals) {
+    this.writeCodes([
+      `(${functionName})`,
+      'D=0'
+    ]);
+    for (let i = 0; i < numLocals; i++) {
+      this.writePushFromD();
+    }
+  }
+
   writeCodes(codes) {
     fs.appendFileSync(this.outputPath, codes.join('\n') + '\n');
   }
@@ -213,9 +282,8 @@ class CodeWriter {
       'A=M'
     ]);
 
-    const indexNum = Number(index);
-    if (indexNum) {
-      this.writeCodes(new Array(indexNum).fill('A=A+1'));
+    if (index) {
+      this.writeCodes(new Array(index).fill('A=A+1'));
     }
 
     this.writeCodes(['D=M']);
@@ -232,9 +300,8 @@ class CodeWriter {
       'A=M'
     ]);
 
-    const indexNum = Number(index);
-    if (indexNum) {
-      this.writeCodes(new Array(indexNum).fill('A=A+1'));
+    if (index) {
+      this.writeCodes(new Array(index).fill('A=A+1'));
     }
 
     this.writeCodes(['M=D']);
@@ -244,9 +311,8 @@ class CodeWriter {
     const label = this.getLabelBySegment(segment);
     this.writeCodes([`@${label}`]);
 
-    const indexNum = Number(index);
-    if (indexNum) {
-      this.writeCodes(new Array(indexNum).fill('A=A+1'));
+    if (index) {
+      this.writeCodes(new Array(index).fill('A=A+1'));
     }
 
     this.writeCodes(['D=M']);
@@ -262,9 +328,8 @@ class CodeWriter {
       `@${label}`
     ]);
 
-    const indexNum = Number(index);
-    if (indexNum) {
-      this.writeCodes(new Array(indexNum).fill('A=A+1'));
+    if (index) {
+      this.writeCodes(new Array(index).fill('A=A+1'));
     }
 
     this.writeCodes(['M=D']);
