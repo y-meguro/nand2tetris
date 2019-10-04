@@ -43,13 +43,13 @@ class CodeWriter {
         this.writePushFromD();
       } else if (['local', 'argument', 'this', 'that'].includes(segment)) {
         this.writePushFromReferencedSegment(segment, index);
-      } else if (['temp'].includes(segment)) {
+      } else if (['pointer', 'temp'].includes(segment)) {
         this.writePushFromFixedSegment(segment, index);
       }
     } else if (command === C_POP) {
       if (['local', 'argument', 'this', 'that'].includes(segment)) {
         this.writePopToReferencedSegment(segment, index);
-      } else if (['temp'].includes(segment)) {
+      } else if (['pointer', 'temp'].includes(segment)) {
         this.writePopToFixedSegment(segment, index);
       }
     } else {
@@ -157,6 +157,8 @@ class CodeWriter {
       return 'THIS';
     } else if (segment === 'that') {
       return 'THAT';
+    } else if (segment === 'pointer') {
+      return '3';
     } else if (segment === 'temp') {
       return '5';
     } else {
