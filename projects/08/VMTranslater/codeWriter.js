@@ -45,7 +45,7 @@ class CodeWriter {
     } else if (['eq', 'gt', 'lt'].includes(command)) {
       this.writeCompare(command);
     } else {
-      throw new Error('invalid command for writeArithmetic');
+      throw new Error(`invalid command for writeArithmetic: ${command}`);
     }
   }
 
@@ -68,7 +68,7 @@ class CodeWriter {
         ]);
         this.writePushFromD();
       } else {
-        throw new Error('invalid segment');
+        throw new Error(`invalid segment: ${segment}`);
       }
     } else if (command === C_POP) {
       if (['local', 'argument', 'this', 'that'].includes(segment)) {
