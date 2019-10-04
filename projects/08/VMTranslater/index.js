@@ -31,12 +31,13 @@ const vmTranslater = () => {
 
   for (const file of files) {
     const filePath = directoryPath + '/' + file;
-    translate(filePath, codeWriter);
+    translate(file, filePath, codeWriter);
   }
 };
 
-const translate = (filePath, codeWriter) => {
+const translate = (fileName, filePath, codeWriter) => {
   const parser = new Parser(filePath);
+  codeWriter.setFileName(fileName);
 
   while (parser.hasMoreCommands()) {
     if (parser.commandType() === C_ARITHMETIC) {

@@ -1,25 +1,14 @@
 const fs = require('fs');
 
 const {
-  C_ARITHMETIC,
   C_PUSH,
-  C_POP,
-  C_LABEL,
-  C_GOTO,
-  C_IF,
-  C_FUNCTION,
-  C_RETURN,
-  C_CALL
+  C_POP
 } = require('./constants');
 
 class CodeWriter {
   constructor(filePath) {
     this.outputPath = __dirname + '/' + filePath;
     fs.writeFileSync(this.outputPath, '');
-
-    const index = filePath.lastIndexOf('/');
-    const index2 = filePath.lastIndexOf('.');
-    this.fileName = filePath.slice(index + 1, index2);
 
     this.labelNumForCompare = 0;
     this.labelNumForReturnAddress = 0;
@@ -35,6 +24,10 @@ class CodeWriter {
       'M=D',
     ]);
     this.writeCall('Sys.init', 0);
+  }
+
+  setFileName(fileName) {
+    this.fileName = fileName;
   }
 
   writeArithmetic(command) {
