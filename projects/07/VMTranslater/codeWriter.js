@@ -1,5 +1,17 @@
 const fs = require('fs');
 
+const {
+  C_ARITHMETIC,
+  C_PUSH,
+  C_POP,
+  C_LABEL,
+  C_GOTO,
+  C_IF,
+  C_FUNCTION,
+  C_RETURN,
+  C_CALL
+} = require('./constants');
+
 class CodeWriter {
   constructor(filePath) {
     const index = filePath.lastIndexOf('.');
@@ -17,21 +29,31 @@ class CodeWriter {
     } else if (['eq', 'gt', 'lt'].includes(command)) {
       this.writeCompare(command);
     } else {
-      throw new Error('invalid arithmetic command');
+      throw new Error('invalid command for writeArithmetic');
     }
   }
 
   writePushPop(command, segment, index) {
-    const codes = [];
-    if (command === 'push') {
+    if (command === C_PUSH) {
       if (segment === 'constant') {
-        codes.push(
-          '@' + index,
+        this.writeCodes([
+          `@${index}`,
           'D=A'
-        );
-        this.writeCodes(codes);
+        ]);
         this.writePushFromD();
+      } else if (['local', 'argument', 'this', 'that'].includes(segment)) {
+        this.writePushFromReferencedSegment(segment, index);
+      } else if (['temp'].includes(segment)) {
+        this.writePushFromFixedSegment(segment, index);
       }
+    } else if (command === C_POP) {
+      if (['local', 'argument', 'this', 'that'].includes(segment)) {
+        this.writePopToReferencedSegment(segment, index);
+      } else if (['temp'].includes(segment)) {
+        this.writePopToFixedSegment(segment, index);
+      }
+    } else {
+      throw new Error('invalid command for writePushPop');
     }
   }
 
@@ -66,7 +88,7 @@ class CodeWriter {
     } else if (command === 'not') {
       formula = 'D=!M';
     } else {
-      throw new Error('c');
+      throw new Error('invalid command for writeCalc1Value');
     }
 
     this.writePopToA();
@@ -124,6 +146,86 @@ class CodeWriter {
     this.writePushFromD();
 
     this.labelNum = this.labelNum + 1;
+  }
+
+  getLabelBySegment(segment) {
+    if (segment === 'local') {
+      return 'LCL';
+    } else if (segment === 'argument') {
+      return 'ARG';
+    } else if (segment === 'this') {
+      return 'THIS';
+    } else if (segment === 'that') {
+      return 'THAT';
+    } else if (segment === 'temp') {
+      return '5';
+    } else {
+      throw new Error(`invalid segment: ${segment}`);
+    }
+  }
+
+  writePushFromReferencedSegment(segment, index) {
+    const label = this.getLabelBySegment(segment);
+    this.writeCodes([
+      `@${label}`,
+      'A=M'
+    ]);
+
+    const indexNum = Number(index);
+    if (indexNum) {
+      this.writeCodes(new Array(indexNum).fill('A=A+1'));
+    }
+
+    this.writeCodes(['D=M']);
+    this.writePushFromD();
+  }
+
+  writePopToReferencedSegment(segment, index) {
+    this.writePopToA();
+
+    const label = this.getLabelBySegment(segment);
+    this.writeCodes([
+      'D=M',
+      `@${label}`,
+      'A=M'
+    ]);
+
+    const indexNum = Number(index);
+    if (indexNum) {
+      this.writeCodes(new Array(indexNum).fill('A=A+1'));
+    }
+
+    this.writeCodes(['M=D']);
+  }
+
+  writePushFromFixedSegment(segment, index) {
+    const label = this.getLabelBySegment(segment);
+    this.writeCodes([`@${label}`]);
+
+    const indexNum = Number(index);
+    if (indexNum) {
+      this.writeCodes(new Array(indexNum).fill('A=A+1'));
+    }
+
+    this.writeCodes(['D=M']);
+    this.writePushFromD();
+  }
+
+  writePopToFixedSegment(segment, index) {
+    this.writePopToA();
+
+    const label = this.getLabelBySegment(segment);
+    this.writeCodes([
+      'D=M',
+      `@${label}`
+    ]);
+
+    const indexNum = Number(index);
+    if (indexNum) {
+      this.writeCodes(new Array(indexNum).fill('A=A+1'));
+    }
+
+    this.writeCodes(['M=D']);
   }
 }
 

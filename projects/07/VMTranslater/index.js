@@ -27,7 +27,11 @@ const vmTranslater = () => {
     } else if (parser.commandType() === C_PUSH) {
       const segment = parser.arg1();
       const index = parser.arg2();
-      codeWriter.writePushPop('push', segment, index);
+      codeWriter.writePushPop(C_PUSH, segment, index);
+    } else if (parser.commandType() === C_POP) {
+      const segment = parser.arg1();
+      const index = parser.arg2();
+      codeWriter.writePushPop(C_POP, segment, index);
     }
     parser.advance();
   }
