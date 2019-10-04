@@ -18,6 +18,9 @@ class CodeWriter {
     this.outputPath = __dirname + '/' + filePath.slice(0, index) + '.asm';
     fs.writeFileSync(this.outputPath, '');
 
+    const index2 = this.outputPath.lastIndexOf('/');
+    this.fileName = this.outputPath.slice(index2 + 1);
+
     this.labelNum = 0;
   }
 
@@ -45,12 +48,29 @@ class CodeWriter {
         this.writePushFromReferencedSegment(segment, index);
       } else if (['pointer', 'temp'].includes(segment)) {
         this.writePushFromFixedSegment(segment, index);
+      } else if (segment === 'static') {
+        this.writeCodes([
+          `@${this.fileName}.${index}`,
+          'D=M'
+        ]);
+        this.writePushFromD();
+      } else {
+        throw new Error('invalid segment');
       }
     } else if (command === C_POP) {
       if (['local', 'argument', 'this', 'that'].includes(segment)) {
         this.writePopToReferencedSegment(segment, index);
       } else if (['pointer', 'temp'].includes(segment)) {
         this.writePopToFixedSegment(segment, index);
+      } else if (segment === 'static') {
+        this.writePopToA();
+        this.writeCodes([
+          'D=M',
+          `@${this.fileName}.${index}`,
+          'M=D'
+        ]);
+      } else {
+        throw new Error('invalid segment');
       }
     } else {
       throw new Error('invalid command for writePushPop');
@@ -162,7 +182,7 @@ class CodeWriter {
     } else if (segment === 'temp') {
       return '5';
     } else {
-      throw new Error(`invalid segment: ${segment}`);
+      throw new Error('invalid segment');
     }
   }
 
