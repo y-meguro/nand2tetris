@@ -77,6 +77,26 @@ class CodeWriter {
     }
   }
 
+  writeLabel(label) {
+    this.writeCodes([`(${label})`]);
+  }
+
+  writeGoto(label) {
+    this.writeCodes([
+      `@${label}`,
+      '0;JMP'
+    ]);
+  }
+
+  writeIf(label) {
+    this.writePopToA();
+    this.writeCodes([
+      'D=M',
+      `@${label}`,
+      'D;JNE'
+    ]);
+  }
+
   writeCodes(codes) {
     fs.appendFileSync(this.outputPath, codes.join('\n') + '\n');
   }

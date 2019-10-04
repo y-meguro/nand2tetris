@@ -32,6 +32,15 @@ const vmTranslater = () => {
       const segment = parser.arg1();
       const index = parser.arg2();
       codeWriter.writePushPop(C_POP, segment, index);
+    } else if (parser.commandType() === C_LABEL) {
+      const label = parser.arg1();
+      codeWriter.writeLabel(label);
+    } else if (parser.commandType() === C_GOTO) {
+      const label = parser.arg1();
+      codeWriter.writeGoto(label);
+    } else if (parser.commandType() === C_IF) {
+      const label = parser.arg1();
+      codeWriter.writeIf(label);
     }
     parser.advance();
   }
