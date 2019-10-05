@@ -18,7 +18,7 @@ class JackTokenizer {
       fileContent = fileContent.slice(0, index) + fileContent.slice(index2 + 2);
     }
     const lines = fileContent.split(/\n/).filter((line) => {
-      return line !== '' && !line.startsWith('//');
+      return line.trim() !== '' && !line.trim().startsWith('//');
     });
 
     // delete comments for each lines
@@ -30,44 +30,41 @@ class JackTokenizer {
     this.tokens = [];
     const reg = /[\{\}\(\)\[\]\.,;\+\-\*\/&\|<>=~]/;
 
+    const parserUnit = (unit) => {
+      while (unit) {
+        if (unit.match(reg)) {
+          const index = unit.match(reg).index;
+          if (index !== 0) {
+            this.tokens.push(unit.slice(0, index));
+          }
+          this.tokens.push(unit.slice(index, index + 1));
+          unit = unit.slice(index + 1);
+        } else {
+          this.tokens.push(unit);
+          unit = '';
+        }
+      }
+    };
+
     linesWithoutComments.forEach((line) => {
       while (line) {
+        const doubleQuoteIndex = line.indexOf('"');
+        const spaceIndex = line.indexOf(' ');
         if (line.startsWith('"')) {
           const index = line.indexOf('"', 1);
           this.tokens.push(line.slice(0, index + 1));
           line = line.slice(index + 1).trim();
-        } else if (line.indexOf(' ') !== -1) {
-          const index = line.indexOf(' ');
-          let unit = line.slice(0, index);
-          line = line.slice(index + 1).trim();
-
-          while (unit) {
-            if (unit.match(reg)) {
-              const index = unit.match(reg).index;
-              if (index !== 0) {
-                this.tokens.push(unit.slice(0, index));
-              }
-              this.tokens.push(unit.slice(index, index + 1));
-              unit = unit.slice(index + 1);
-            } else {
-              this.tokens.push(unit);
-              unit = '';
-            }
-          }
+        } else if (doubleQuoteIndex !== -1 && spaceIndex !== -1 && doubleQuoteIndex < spaceIndex) {
+          let unit = line.slice(0, doubleQuoteIndex);
+          parserUnit(unit);
+          line = line.slice(doubleQuoteIndex).trim();
+        } else if (spaceIndex !== -1) {
+          let unit = line.slice(0, spaceIndex);
+          parserUnit(unit);
+          line = line.slice(spaceIndex + 1).trim();
         } else {
-          while (line) {
-            if (line.match(reg)) {
-              const index = line.match(reg).index;
-              if (index !== 0) {
-                this.tokens.push(line.slice(0, index));
-              }
-              this.tokens.push(line.slice(index, index + 1));
-              line = line.slice(index + 1);
-            } else {
-              this.tokens.push(line);
-              line = '';
-            }
-          }
+          parserUnit(line);
+          line = '';
         }
       }
     });
