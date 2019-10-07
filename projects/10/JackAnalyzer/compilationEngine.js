@@ -45,12 +45,21 @@ class CompilationEngine {
   }
 
   compileSymbol(symbols) {
-    const symbol = this.jackTokenizer.symbol();
+    let symbol = this.jackTokenizer.symbol();
     if (!symbols.includes(symbol)) {
       throw new Error(`invalid symbol, symbol: ${symbol}, expected symbols: ${symbols}, currentToken: ${this.jackTokenizer.currentToken}`);
     }
     this.checkToken(TOKEN_TYPE.SYMBOL);
-    this.writeElement('symbol', this.jackTokenizer.symbol());
+
+    if (this.jackTokenizer.currentToken === '<') {
+      symbol = '&lt;'
+    } else if (this.jackTokenizer.currentToken === '>') {
+      symbol = '&gt;'
+    } else if (this.jackTokenizer.currentToken === '&') {
+      symbol = '&amp;'
+    }
+
+    this.writeElement('symbol', symbol);
     this.jackTokenizer.advance();
   }
 
@@ -62,8 +71,8 @@ class CompilationEngine {
 
   compileStringConstant() {
     this.checkToken(TOKEN_TYPE.STRING_CONST);
-    this.writeElement('stringConstant', jackTokenizer.stringVal());
-    jackTokenizer.advance();
+    this.writeElement('stringConstant', this.jackTokenizer.stringVal());
+    this.jackTokenizer.advance();
   }
 
   compileIdentifier() {
@@ -329,19 +338,28 @@ class CompilationEngine {
       this.compileKeyword([KEYWORDS.TRUE, KEYWORDS.FALSE, KEYWORDS.NULL, KEYWORDS.THIS]);
     } else if (this.jackTokenizer.tokenType() === TOKEN_TYPE.IDENTIFIER) {
       this.compileIdentifier();
-      if (this.jackTokenizer.tokenType() === SYMBOLS.LEFT_SQUARE_BRACKET)
-        this.compileSymbol([SYMBOLS.LEFT_SQUARE_BRACKET]);
-        if (this.jackTokenizer.currentToken === SYMBOLS.LEFT_SQUARE_BRACKET) {
+      if (this.jackTokenizer.currentToken === SYMBOLS.LEFT_SQUARE_BRACKET) {
         this.compileSymbol([SYMBOLS.LEFT_SQUARE_BRACKET]);
         this.compileExpression();
         this.compileSymbol([SYMBOLS.RIGHT_SQUARE_BRACKET]);
+      } else if (this.jackTokenizer.currentToken === SYMBOLS.LEFT_ROUND_BRACKET) {
+        this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
+        this.compileExpressionList();
+        this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
+      } else if (this.jackTokenizer.currentToken === SYMBOLS.PERIOD) {
+        this.compileSymbol([SYMBOLS.PERIOD]);
+        this.compileIdentifier();
+        this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
+        this.compileExpressionList();
+        this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
       }
     } else if (this.jackTokenizer.currentToken === SYMBOLS.LEFT_ROUND_BRACKET) {
       this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
       this.compileExpression();
       this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
     } else if ([SYMBOLS.HYPHEN, SYMBOLS.TILDE].includes(this.jackTokenizer.currentToken)) {
-      this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
+      this.compileSymbol([SYMBOLS.HYPHEN, SYMBOLS.TILDE]);
+      this.compileTerm();
     } else {
       throw new Error(`invalid term: ${this.jackTokenizer.currentToken}`);
     }

@@ -106,15 +106,7 @@ class JackTokenizer {
 
   symbol() {
     if (this.tokenType() !== TOKEN_TYPE.SYMBOL) return;
-    if (this.currentToken === '<') {
-      return '&lt;'
-    } else if (this.currentToken === '>') {
-      return '&gt;'
-    } else if (this.currentToken === '&') {
-      return '&amp;'
-    } else {
-      return this.currentToken;
-    }
+    return this.currentToken;
   }
 
   identifier() {
