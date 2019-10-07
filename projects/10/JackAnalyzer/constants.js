@@ -30,27 +30,27 @@ const KEYWORDS = {
   RETURN: 'return'
 };
 
-const SYMBOLS = [
-  '{',
-  '}',
-  '(',
-  ')',
-  '[',
-  ']',
-  '.',
-  ',',
-  ';',
-  '+',
-  '-',
-  '*',
-  '/',
-  '&',
-  '|',
-  '<',
-  '>',
-  '=',
-  '~'
-];
+const SYMBOLS = {
+  LEFT_CURLY_BRACKET: '{',
+  RIGHT_CURLY_BRACKET: '}',
+  LEFT_ROUND_BRACKET: '(',
+  RIGHT_ROUND_BRACKET: ')',
+  LEFT_SQUARE_BRACKET: '[',
+  RIGHT_SQUARE_BRACKET: ']',
+  PERIOD: '.',
+  COMMA: ',',
+  SEMI_COLON: ';',
+  PLUS_SIGN: '+',
+  HYPHEN: '-',
+  ASTERISK: '*',
+  SLASH: '/',
+  AMPERSAND: '&',
+  VERTICAL_LINE: '|',
+  LESS_THAN_SIGN: '<',
+  GREATER_THAN_SIGN: '>',
+  EQUAL: '=',
+  TILDE: '~'
+};
 
 module.exports = {
   TOKEN_TYPE,

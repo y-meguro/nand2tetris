@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require("path");
-
 const {
   TOKEN_TYPE,
   KEYWORDS,
@@ -87,7 +86,7 @@ class JackTokenizer {
   tokenType() {
     if (Object.values(KEYWORDS).includes(this.currentToken)) {
       return TOKEN_TYPE.KEYWORD;
-    } else if (SYMBOLS.includes(this.currentToken)) {
+    } else if (Object.values(SYMBOLS).includes(this.currentToken)) {
       return TOKEN_TYPE.SYMBOL;
     } else if (this.currentToken.match(/^[0-9]+$/) && Number(this.currentToken) <= 32767) {
       return TOKEN_TYPE.INT_CONST;
