@@ -54,7 +54,7 @@ const SYMBOLS = {
 
 const SEGMENT = {
   CONST: 'constant',
-  ARG: 'argument',
+  ARGUMENT: 'argument',
   LOCAL: 'local',
   STATIC: 'static',
   THIS: 'this',
@@ -77,6 +77,7 @@ const COMMAND = {
   NEG: 'neg',
   AND: 'and',
   OR: 'or',
+  NOT: 'not',
   LT: 'lt',
   GT: 'gt',
   EQ: 'eq'

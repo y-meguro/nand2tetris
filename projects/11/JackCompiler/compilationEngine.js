@@ -18,17 +18,19 @@ class CompilationEngine {
     this.symbolTable = new SymbolTable();
     this.vmWriter = new VMWriter(outputFilePath);
 
-    this.outputFilePath = outputFilePath.slice(0, -3) + '.xml';
-    fs.writeFileSync(this.outputFilePath, '');
+    this.outputFilePathForVM = outputFilePath;
+    this.outputFilePathForXML = outputFilePath.slice(0, -3) + '.xml';
+    fs.writeFileSync(this.outputFilePathForXML, '');
     this.className = '';
 
     this.indentCount = 0;
+    this.labelCount = 0;
     this.compileClass();
   }
 
   writeElement(tagName, value) {
     const indent = '  '.repeat(this.indentCount);
-    fs.appendFileSync(this.outputFilePath, `${indent}<${tagName}> ${value} </${tagName}>` + '\n');
+    fs.appendFileSync(this.outputFilePathForXML, `${indent}<${tagName}> ${value} </${tagName}>` + '\n');
   }
 
   writeIdentifier(name, isDefined) {
@@ -39,19 +41,19 @@ class CompilationEngine {
     const index = this.symbolTable.indexOf(name);
     const info = `isDefined: ${isDefined}, type: ${type}, kind: ${kind}, index: ${index}`
 
-    fs.appendFileSync(this.outputFilePath, `${indent}<identifier> ${name} </identifier> ${info}` + '\n');
+    fs.appendFileSync(this.outputFilePathForXML, `${indent}<identifier> ${name} </identifier> ${info}` + '\n');
   }
 
   writeElementStart(tagName) {
     const indent = '  '.repeat(this.indentCount);
-    fs.appendFileSync(this.outputFilePath, `${indent}<${tagName}>` + '\n');
+    fs.appendFileSync(this.outputFilePathForXML, `${indent}<${tagName}>` + '\n');
     this.indentCount = this.indentCount + 1;
   }
 
   writeElementEnd(tagName) {
     this.indentCount = this.indentCount - 1;
     const indent = '  '.repeat(this.indentCount);
-    fs.appendFileSync(this.outputFilePath, `${indent}</${tagName}>` + '\n');
+    fs.appendFileSync(this.outputFilePathForXML, `${indent}</${tagName}>` + '\n');
   }
 
   compileKeyword(keywords) {
@@ -101,13 +103,31 @@ class CompilationEngine {
     this.jackTokenizer.advance();
   }
 
-  compileVarName(isDefined, type=null, kind=null) {
+  compileVarName(isDefined, type=null, kind=null, shouldWritePush=true) {
     this.checkToken(TOKEN_TYPE.IDENTIFIER);
     const name = this.jackTokenizer.identifier();
     if (isDefined) {
       this.symbolTable.define(name, type, kind);
     }
     this.writeIdentifier(name, isDefined);
+
+    kind = this.symbolTable.kindOf(name);
+    const index = this.symbolTable.indexOf(name);
+
+    if (shouldWritePush) {
+      let segment = '';
+      if (kind === KIND.STATIC) {
+        segment = SEGMENT.STATIC;
+      } else if (kind === KIND.FIELD) {
+        segment = SEGMENT.THIS;
+      } else if (kind === KIND.ARGUMENT) {
+        segment = SEGMENT.ARGUMENT;
+      } else if (kind === KIND.VAR) {
+        segment = SEGMENT.LOCAL;
+      }
+      this.vmWriter.writePush(segment, index);
+    }
+
     this.jackTokenizer.advance();
   }
 
@@ -167,23 +187,20 @@ class CompilationEngine {
     this.symbolTable.startSubroutine();
     this.writeElementStart('subroutineDec');
 
-    const keyword = this.jackTokenizer.currentToken;
+    const subroutineKeyword = this.jackTokenizer.currentToken;
     this.compileKeyword([KEYWORDS.CONSTRUCTOR, KEYWORDS.FUNCTION, KEYWORDS.METHOD]);
     if (this.jackTokenizer.currentToken === KEYWORDS.VOID) {
-      this.compileKeyword([KEYWORDS.CONSTRUCTOR, KEYWORDS.FUNCTION, KEYWORDS.METHOD, KEYWORDS.VOID]);
+      this.compileKeyword([KEYWORDS.VOID]);
     } else {
       this.compileType();
     }
 
-    const name = this.className + '.' + this.jackTokenizer.currentToken;
+    const functionName = this.className + '.' + this.jackTokenizer.currentToken;
     this.compileIdentifier();
     this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
-    const nLocals = this.compileParameterList();
+    this.compileParameterList();
     this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
-    if (keyword === KEYWORDS.FUNCTION) {
-      this.vmWriter.writeFunction(name, nLocals);
-    }
-    this.compileSubroutineBody();
+    this.compileSubroutineBody(functionName, subroutineKeyword);
 
     this.writeElementEnd('subroutineDec');
   }
@@ -191,9 +208,7 @@ class CompilationEngine {
   compileParameterList() {
     this.writeElementStart('parameterList');
 
-    let nLocals = 0;
     if ([KEYWORDS.INT, KEYWORDS.CHAR, KEYWORDS.BOOLEAN].includes(this.jackTokenizer.currentToken) || this.jackTokenizer.tokenType() === TOKEN_TYPE.IDENTIFIER) {
-      nLocals = 1;
       const type = this.jackTokenizer.currentToken;
       this.compileType();
       this.compileVarName(true, type, KIND.ARGUMENT);
@@ -203,21 +218,33 @@ class CompilationEngine {
         const type = this.jackTokenizer.currentToken;
         this.compileType();
         this.compileVarName(true, type, KIND.ARGUMENT);
-        nLocals = nLocals + 1;
       }
     }
 
     this.writeElementEnd('parameterList');
-    return nLocals;
   }
 
-  compileSubroutineBody() {
+  compileSubroutineBody(functionName, subroutineKeyword) {
     this.writeElementStart('subroutineBody');
 
     this.compileSymbol([SYMBOLS.LEFT_CURLY_BRACKET]);
-    while (this.jackTokenizer.currentToken === KEYWORDS.VAR) {
-      this.compileVarDec();
+
+    if (subroutineKeyword === KEYWORDS.FUNCTION) {
+      this.vmWriter.writeFunction(functionName, 0);
     }
+    let nLocals = 0;
+    while (this.jackTokenizer.currentToken === KEYWORDS.VAR) {
+      nLocals = nLocals + 1;
+      const varNum = this.compileVarDec();
+      nLocals = nLocals + varNum;
+    }
+
+    if (subroutineKeyword === KEYWORDS.FUNCTION && nLocals !== 0) {
+      const fileContent = fs.readFileSync(this.outputFilePathForVM, {encoding: "utf-8"});
+      const newContent = fileContent.replace(`${functionName} 0`, `${functionName} ${nLocals}`);
+      fs.writeFileSync(this.outputFilePathForVM, newContent);
+    }
+
     this.compileStatements();
     this.compileSymbol([SYMBOLS.RIGHT_CURLY_BRACKET]);
 
@@ -232,13 +259,16 @@ class CompilationEngine {
     this.compileType();
     this.compileVarName(true, type, KIND.VAR);
 
+    let varNum = 0;
     while (this.jackTokenizer.currentToken === SYMBOLS.COMMA) {
+      varNum = varNum + 1;
       this.compileSymbol([SYMBOLS.COMMA]);
       this.compileVarName(true, type, KIND.VAR);
     }
     this.compileSymbol([SYMBOLS.SEMI_COLON]);
 
     this.writeElementEnd('varDec');
+    return varNum;
   }
 
   compileStatements() {
@@ -270,7 +300,7 @@ class CompilationEngine {
     this.compileSubroutineCall();
     this.compileSymbol([SYMBOLS.SEMI_COLON]);
 
-    // this.vmWriter.writePop(SEGMENT.TEMP, 0);
+    this.vmWriter.writePop(SEGMENT.TEMP, 0);
     this.writeElementEnd('doStatement');
   }
 
@@ -278,7 +308,8 @@ class CompilationEngine {
     this.writeElementStart('letStatement');
 
     this.compileKeyword([KEYWORDS.LET]);
-    this.compileVarName(false);
+    const name = this.jackTokenizer.currentToken;
+    this.compileVarName(false, null, null, false);
     while (this.jackTokenizer.currentToken !== SYMBOLS.EQUAL) {
       this.compileSymbol([SYMBOLS.LEFT_SQUARE_BRACKET]);
       this.compileExpression();
@@ -288,19 +319,40 @@ class CompilationEngine {
     this.compileExpression();
     this.compileSymbol([SYMBOLS.SEMI_COLON]);
 
+    const kind = this.symbolTable.kindOf(name);
+    const index = this.symbolTable.indexOf(name);
+    if (kind === KIND.STATIC) {
+      this.vmWriter.writePop(SEGMENT.STATIC, index);
+    } else if (kind === KIND.FIELD) {
+      this.vmWriter.writePop(SEGMENT.THIS, index);
+    } else if (kind === KIND.ARGUMENT) {
+      this.vmWriter.writePop(SEGMENT.ARGUMENT, index);
+    } else if (kind === KIND.VAR) {
+      this.vmWriter.writePop(SEGMENT.LOCAL, index);
+    }
+
     this.writeElementEnd('letStatement');
   }
 
   compileWhile() {
     this.writeElementStart('whileStatement');
 
+    const labelLoop = `WHILE_LOOP_${this.labelCount}`;
+    const labelEnd = `WHILE_END_${this.labelCount}`;
+    this.labelCount = this.labelCount + 1;
+
+    this.vmWriter.writeLabel(labelLoop);
     this.compileKeyword([KEYWORDS.WHILE]);
     this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
     this.compileExpression();
+    this.vmWriter.writeArithmetic(COMMAND.NOT);
+    this.vmWriter.writeIf(labelEnd);
     this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
     this.compileSymbol([SYMBOLS.LEFT_CURLY_BRACKET]);
     this.compileStatements();
     this.compileSymbol([SYMBOLS.RIGHT_CURLY_BRACKET]);
+    this.vmWriter.writeGoto(labelLoop);
+    this.vmWriter.writeLabel(labelEnd);
 
     this.writeElementEnd('whileStatement');
   }
@@ -321,20 +373,29 @@ class CompilationEngine {
   compileIf() {
     this.writeElementStart('ifStatement');
 
+    const labelElse = `IF_ELSE_${this.labelCount}`;
+    const labelEnd = `IF_END_${this.labelCount}`;
+    this.labelCount = this.labelCount + 1;
+
     this.compileKeyword([KEYWORDS.IF]);
     this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
     this.compileExpression();
+    this.vmWriter.writeArithmetic(COMMAND.NOT);
+    this.vmWriter.writeIf(labelElse);
     this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
     this.compileSymbol([SYMBOLS.LEFT_CURLY_BRACKET]);
     this.compileStatements();
     this.compileSymbol([SYMBOLS.RIGHT_CURLY_BRACKET]);
+    this.vmWriter.writeGoto(labelEnd);
 
+    this.vmWriter.writeLabel(labelElse);
     if (this.jackTokenizer.currentToken === KEYWORDS.ELSE) {
       this.compileKeyword([KEYWORDS.ELSE]);
       this.compileSymbol([SYMBOLS.LEFT_CURLY_BRACKET]);
       this.compileStatements();
       this.compileSymbol([SYMBOLS.RIGHT_CURLY_BRACKET]);
     }
+    this.vmWriter.writeLabel(labelEnd);
 
     this.writeElementEnd('ifStatement');
   }
@@ -429,7 +490,7 @@ class CompilationEngine {
       this.vmWriter.writePush(SEGMENT.POINTER, 0);
       this.compileKeyword([KEYWORDS.THIS]);
     } else if (this.jackTokenizer.tokenType() === TOKEN_TYPE.IDENTIFIER) {
-      const name = this.jackTokenizer.tokenType();
+      let name = this.jackTokenizer.currentToken;
       if (this.symbolTable.kindOf(name) !== KIND.NONE) {
         this.compileVarName(false);
       } else {
@@ -441,27 +502,30 @@ class CompilationEngine {
         this.compileSymbol([SYMBOLS.RIGHT_SQUARE_BRACKET]);
       } else if (this.jackTokenizer.currentToken === SYMBOLS.LEFT_ROUND_BRACKET) {
         this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
-        this.compileExpressionList();
+        const nArgs = this.compileExpressionList();
         this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
+        this.vmWriter.writeCall(name, nArgs);
       } else if (this.jackTokenizer.currentToken === SYMBOLS.PERIOD) {
         this.compileSymbol([SYMBOLS.PERIOD]);
+        name = name + '.' + this.jackTokenizer.currentToken;
         this.compileIdentifier();
         this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
-        this.compileExpressionList();
+        const nArgs = this.compileExpressionList();
         this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
+        this.vmWriter.writeCall(name, nArgs);
       }
     } else if (this.jackTokenizer.currentToken === SYMBOLS.LEFT_ROUND_BRACKET) {
       this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
       this.compileExpression();
       this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
     } else if (this.jackTokenizer.currentToken === SYMBOLS.HYPHEN) {
-      this.vmWriter.writeArithmetic(COMMAND.NEG);
       this.compileSymbol([SYMBOLS.HYPHEN]);
       this.compileTerm();
+      this.vmWriter.writeArithmetic(COMMAND.NEG);
     } else if (this.jackTokenizer.currentToken === SYMBOLS.TILDE) {
-      this.vmWriter.writeArithmetic(COMMAND.NOT);
       this.compileSymbol([SYMBOLS.TILDE]);
       this.compileTerm();
+      this.vmWriter.writeArithmetic(COMMAND.NOT);
     } else {
       throw new Error(`invalid term: ${this.jackTokenizer.currentToken}`);
     }
