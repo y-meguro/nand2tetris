@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require("path");
 const CompilationEngine = require('./compilationEngine');
 
-// call like "node projects/10/JackAnalyzer/index.js ../Square"
+// call like "node projects/11/JackCompiler/index.js ../Square"
 const jackAnalyzer = () => {
   const directoryPath = process.argv[2];
   const allFiles = fs.readdirSync(path.resolve(__dirname, directoryPath));
@@ -12,7 +12,7 @@ const jackAnalyzer = () => {
 
   for (const file of files) {
     const inputFilePath = directoryPath + '/' + file;
-    const outputFilePath = __dirname + '/' + (directoryPath + '/' + file).slice(0, -5) + '2.xml';
+    const outputFilePath = __dirname + '/' + (directoryPath + '/' + file).slice(0, -5) + '.xml';
     new CompilationEngine(inputFilePath, outputFilePath);
   }
 };
