@@ -1,6 +1,7 @@
 const fs = require('fs');
 const JackTokenizer = require('./jackTokenizer');
 const SymbolTable = require('./symbolTable');
+const VMWriter = require('./vmWriter');
 
 const {
   TOKEN_TYPE,
@@ -11,34 +12,43 @@ const {
 
 class CompilationEngine {
   constructor(inputFilePath, outputFilePath) {
-    this.outputFilePath = outputFilePath;
-    fs.writeFileSync(this.outputFilePath, '');
-
     this.jackTokenizer = new JackTokenizer(inputFilePath);
     this.symbolTable = new SymbolTable();
+    this.vmWriter = new VMWriter(outputFilePath);
 
+    this.outputFilePath = outputFilePath.slice(0, -3) + '.xml';
+    fs.writeFileSync(this.outputFilePath, '');
+
+    this.indentCount = 0;
     this.compileClass();
   }
 
   writeElement(tagName, value) {
-    fs.appendFileSync(this.outputFilePath, `<${tagName}> ${value} </${tagName}>` + '\n');
+    const indent = '  '.repeat(this.indentCount);
+    fs.appendFileSync(this.outputFilePath, `${indent}<${tagName}> ${value} </${tagName}>` + '\n');
   }
 
   writeIdentifier(name, isDefined) {
+    const indent = '  '.repeat(this.indentCount);
+
     const kind = this.symbolTable.kindOf(name);
     const type = this.symbolTable.typeOf(name);
     const index = this.symbolTable.indexOf(name);
-
     const info = `isDefined: ${isDefined}, type: ${type}, kind: ${kind}, index: ${index}`
-    fs.appendFileSync(this.outputFilePath, `<identifier> ${name} </identifier> ${info}` + '\n');
+
+    fs.appendFileSync(this.outputFilePath, `${indent}<identifier> ${name} </identifier> ${info}` + '\n');
   }
 
   writeElementStart(tagName) {
-    fs.appendFileSync(this.outputFilePath, `<${tagName}>` + '\n');
+    const indent = '  '.repeat(this.indentCount);
+    fs.appendFileSync(this.outputFilePath, `${indent}<${tagName}>` + '\n');
+    this.indentCount = this.indentCount + 1;
   }
 
   writeElementEnd(tagName) {
-    fs.appendFileSync(this.outputFilePath, `</${tagName}>` + '\n');
+    this.indentCount = this.indentCount - 1;
+    const indent = '  '.repeat(this.indentCount);
+    fs.appendFileSync(this.outputFilePath, `${indent}</${tagName}>` + '\n');
   }
 
   compileKeyword(keywords) {
