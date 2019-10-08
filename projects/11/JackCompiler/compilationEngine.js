@@ -7,7 +7,9 @@ const {
   TOKEN_TYPE,
   KEYWORDS,
   SYMBOLS,
+  SEGMENT,
   KIND,
+  COMMAND,
 } = require('./constants');
 
 class CompilationEngine {
@@ -18,6 +20,7 @@ class CompilationEngine {
 
     this.outputFilePath = outputFilePath.slice(0, -3) + '.xml';
     fs.writeFileSync(this.outputFilePath, '');
+    this.className = '';
 
     this.indentCount = 0;
     this.compileClass();
@@ -120,6 +123,7 @@ class CompilationEngine {
     this.writeElementStart('class');
 
     this.compileKeyword([KEYWORDS.CLASS]);
+    this.className = this.jackTokenizer.currentToken;
     this.compileIdentifier();
     this.compileSymbol([SYMBOLS.LEFT_CURLY_BRACKET]);
     while ([KEYWORDS.STATIC, KEYWORDS.FIELD].includes(this.jackTokenizer.currentToken)) {
@@ -163,16 +167,22 @@ class CompilationEngine {
     this.symbolTable.startSubroutine();
     this.writeElementStart('subroutineDec');
 
+    const keyword = this.jackTokenizer.currentToken;
     this.compileKeyword([KEYWORDS.CONSTRUCTOR, KEYWORDS.FUNCTION, KEYWORDS.METHOD]);
     if (this.jackTokenizer.currentToken === KEYWORDS.VOID) {
       this.compileKeyword([KEYWORDS.CONSTRUCTOR, KEYWORDS.FUNCTION, KEYWORDS.METHOD, KEYWORDS.VOID]);
     } else {
       this.compileType();
     }
+
+    const name = this.className + '.' + this.jackTokenizer.currentToken;
     this.compileIdentifier();
     this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
-    this.compileParameterList();
+    const nLocals = this.compileParameterList();
     this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
+    if (keyword === KEYWORDS.FUNCTION) {
+      this.vmWriter.writeFunction(name, nLocals);
+    }
     this.compileSubroutineBody();
 
     this.writeElementEnd('subroutineDec');
@@ -181,7 +191,9 @@ class CompilationEngine {
   compileParameterList() {
     this.writeElementStart('parameterList');
 
-    while ([KEYWORDS.INT, KEYWORDS.CHAR, KEYWORDS.BOOLEAN].includes(this.jackTokenizer.currentToken) || this.jackTokenizer.tokenType() === TOKEN_TYPE.IDENTIFIER) {
+    let nLocals = 0;
+    if ([KEYWORDS.INT, KEYWORDS.CHAR, KEYWORDS.BOOLEAN].includes(this.jackTokenizer.currentToken) || this.jackTokenizer.tokenType() === TOKEN_TYPE.IDENTIFIER) {
+      nLocals = 1;
       const type = this.jackTokenizer.currentToken;
       this.compileType();
       this.compileVarName(true, type, KIND.ARGUMENT);
@@ -191,10 +203,12 @@ class CompilationEngine {
         const type = this.jackTokenizer.currentToken;
         this.compileType();
         this.compileVarName(true, type, KIND.ARGUMENT);
+        nLocals = nLocals + 1;
       }
     }
 
     this.writeElementEnd('parameterList');
+    return nLocals;
   }
 
   compileSubroutineBody() {
@@ -256,6 +270,7 @@ class CompilationEngine {
     this.compileSubroutineCall();
     this.compileSymbol([SYMBOLS.SEMI_COLON]);
 
+    // this.vmWriter.writePop(SEGMENT.TEMP, 0);
     this.writeElementEnd('doStatement');
   }
 
@@ -299,6 +314,7 @@ class CompilationEngine {
     }
     this.compileSymbol([SYMBOLS.SEMI_COLON]);
 
+    this.vmWriter.writeReturn();
     this.writeElementEnd('returnStatement');
   }
 
@@ -324,30 +340,38 @@ class CompilationEngine {
   }
 
   compileSubroutineCall() {
+    let name = this.jackTokenizer.currentToken;
     this.compileIdentifier();
     if (this.jackTokenizer.currentToken === SYMBOLS.PERIOD) {
       this.compileSymbol([SYMBOLS.PERIOD]);
+      name = name + '.' + this.jackTokenizer.currentToken;
       this.compileIdentifier();
     }
 
     this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
-    this.compileExpressionList();
+    const nArgs = this.compileExpressionList();
     this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
+
+    this.vmWriter.writeCall(name, nArgs);
   }
 
   compileExpressionList() {
     this.writeElementStart('expressionList');
 
-    while (this.jackTokenizer.currentToken !== SYMBOLS.RIGHT_ROUND_BRACKET) {
+    let nArgs = 0;
+    if (this.jackTokenizer.currentToken !== SYMBOLS.RIGHT_ROUND_BRACKET) {
+      nArgs = 1;
       this.compileExpression();
 
       while (this.jackTokenizer.currentToken === SYMBOLS.COMMA) {
         this.compileSymbol([SYMBOLS.COMMA]);
         this.compileExpression();
+        nArgs = nArgs + 1;
       }
     }
 
     this.writeElementEnd('expressionList');
+    return nArgs;
   }
 
   compileExpression() {
@@ -355,8 +379,29 @@ class CompilationEngine {
 
     this.compileTerm();
     while ([SYMBOLS.PLUS_SIGN, SYMBOLS.HYPHEN, SYMBOLS.ASTERISK, SYMBOLS.SLASH, SYMBOLS.AMPERSAND, SYMBOLS.VERTICAL_LINE, SYMBOLS.LESS_THAN_SIGN, SYMBOLS.GREATER_THAN_SIGN, SYMBOLS.EQUAL].includes(this.jackTokenizer.currentToken)) {
+      const symbol = this.jackTokenizer.currentToken;
       this.compileSymbol([SYMBOLS.PLUS_SIGN, SYMBOLS.HYPHEN, SYMBOLS.ASTERISK, SYMBOLS.SLASH, SYMBOLS.AMPERSAND, SYMBOLS.VERTICAL_LINE, SYMBOLS.LESS_THAN_SIGN, SYMBOLS.GREATER_THAN_SIGN, SYMBOLS.EQUAL]);
       this.compileTerm();
+
+      if (symbol === SYMBOLS.PLUS_SIGN) {
+        this.vmWriter.writeArithmetic(COMMAND.ADD);
+      } else if (symbol === SYMBOLS.HYPHEN) {
+        this.vmWriter.writeArithmetic(COMMAND.SUB);
+      } else if (symbol === SYMBOLS.ASTERISK) {
+        this.vmWriter.writeCall('Math.multiply', 2);
+      } else if (symbol === SYMBOLS.SLASH) {
+        this.vmWriter.writeCall('Math.divide', 2);
+      } else if (symbol === SYMBOLS.AMPERSAND) {
+        this.vmWriter.writeArithmetic(COMMAND.AND);
+      } else if (symbol === SYMBOLS.VERTICAL_LINE) {
+        this.vmWriter.writeArithmetic(COMMAND.OR);
+      } else if (symbol === SYMBOLS.LESS_THAN_SIGN) {
+        this.vmWriter.writeArithmetic(COMMAND.LT);
+      } else if (symbol === SYMBOLS.GREATER_THAN_SIGN) {
+        this.vmWriter.writeArithmetic(COMMAND.GT);
+      } else if (symbol === SYMBOLS.EQUAL) {
+        this.vmWriter.writeArithmetic(COMMAND.EQ);
+      }
     }
 
     this.writeElementEnd('expression');
@@ -366,11 +411,23 @@ class CompilationEngine {
     this.writeElementStart('term');
 
     if (this.jackTokenizer.tokenType() === TOKEN_TYPE.INT_CONST) {
+      this.vmWriter.writePush(SEGMENT.CONST, this.jackTokenizer.currentToken);
       this.compileIntegerConstant();
     } else if (this.jackTokenizer.tokenType() === TOKEN_TYPE.STRING_CONST) {
       this.compileStringConstant();
-    } else if ([KEYWORDS.TRUE, KEYWORDS.FALSE, KEYWORDS.NULL, KEYWORDS.THIS].includes(this.jackTokenizer.currentToken)) {
-      this.compileKeyword([KEYWORDS.TRUE, KEYWORDS.FALSE, KEYWORDS.NULL, KEYWORDS.THIS]);
+    } else if (this.jackTokenizer.currentToken === KEYWORDS.TRUE) {
+      this.vmWriter.writePush(SEGMENT.CONST, 1);
+      this.vmWriter.writeArithmetic(COMMAND.NEG);
+      this.compileKeyword([KEYWORDS.TRUE]);
+    } else if (this.jackTokenizer.currentToken === KEYWORDS.FALSE) {
+      this.vmWriter.writePush(SEGMENT.CONST, 0);
+      this.compileKeyword([KEYWORDS.FALSE]);
+    } else if (this.jackTokenizer.currentToken === KEYWORDS.NULL) {
+      this.vmWriter.writePush(SEGMENT.CONST, 0);
+      this.compileKeyword([KEYWORDS.NULL]);
+    } else if (this.jackTokenizer.currentToken === KEYWORDS.THIS) {
+      this.vmWriter.writePush(SEGMENT.POINTER, 0);
+      this.compileKeyword([KEYWORDS.THIS]);
     } else if (this.jackTokenizer.tokenType() === TOKEN_TYPE.IDENTIFIER) {
       const name = this.jackTokenizer.tokenType();
       if (this.symbolTable.kindOf(name) !== KIND.NONE) {
@@ -397,8 +454,13 @@ class CompilationEngine {
       this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
       this.compileExpression();
       this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
-    } else if ([SYMBOLS.HYPHEN, SYMBOLS.TILDE].includes(this.jackTokenizer.currentToken)) {
-      this.compileSymbol([SYMBOLS.HYPHEN, SYMBOLS.TILDE]);
+    } else if (this.jackTokenizer.currentToken === SYMBOLS.HYPHEN) {
+      this.vmWriter.writeArithmetic(COMMAND.NEG);
+      this.compileSymbol([SYMBOLS.HYPHEN]);
+      this.compileTerm();
+    } else if (this.jackTokenizer.currentToken === SYMBOLS.TILDE) {
+      this.vmWriter.writeArithmetic(COMMAND.NOT);
+      this.compileSymbol([SYMBOLS.TILDE]);
       this.compileTerm();
     } else {
       throw new Error(`invalid term: ${this.jackTokenizer.currentToken}`);
