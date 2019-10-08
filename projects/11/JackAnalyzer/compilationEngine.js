@@ -1,9 +1,12 @@
 const fs = require('fs');
 const JackTokenizer = require('./jackTokenizer');
+const SymbolTable = require('./symbolTable');
+
 const {
   TOKEN_TYPE,
   KEYWORDS,
   SYMBOLS,
+  KIND,
 } = require('./constants');
 
 class CompilationEngine {
@@ -12,26 +15,30 @@ class CompilationEngine {
     fs.writeFileSync(this.outputFilePath, '');
 
     this.jackTokenizer = new JackTokenizer(inputFilePath);
-    this.indentCount= 0;
+    this.symbolTable = new SymbolTable();
 
     this.compileClass();
   }
 
   writeElement(tagName, value) {
-    const indent = '  '.repeat(this.indentCount);
-    fs.appendFileSync(this.outputFilePath, `${indent}<${tagName}> ${value} </${tagName}>` + '\n');
+    fs.appendFileSync(this.outputFilePath, `<${tagName}> ${value} </${tagName}>` + '\n');
+  }
+
+  writeIdentifier(name, isDefined) {
+    const kind = this.symbolTable.kindOf(name);
+    const type = this.symbolTable.typeOf(name);
+    const index = this.symbolTable.indexOf(name);
+
+    const info = `isDefined: ${isDefined}, type: ${type}, kind: ${kind}, index: ${index}`
+    fs.appendFileSync(this.outputFilePath, `<identifier> ${name} </identifier> ${info}` + '\n');
   }
 
   writeElementStart(tagName) {
-    const indent = '  '.repeat(this.indentCount);
-    fs.appendFileSync(this.outputFilePath, `${indent}<${tagName}>` + '\n');
-    this.indentCount = this.indentCount + 1;
+    fs.appendFileSync(this.outputFilePath, `<${tagName}>` + '\n');
   }
 
   writeElementEnd(tagName) {
-    this.indentCount = this.indentCount - 1;
-    const indent = '  '.repeat(this.indentCount);
-    fs.appendFileSync(this.outputFilePath, `${indent}</${tagName}>` + '\n');
+    fs.appendFileSync(this.outputFilePath, `</${tagName}>` + '\n');
   }
 
   compileKeyword(keywords) {
@@ -81,6 +88,16 @@ class CompilationEngine {
     this.jackTokenizer.advance();
   }
 
+  compileVarName(isDefined, type=null, kind=null) {
+    this.checkToken(TOKEN_TYPE.IDENTIFIER);
+    const name = this.jackTokenizer.identifier();
+    if (isDefined) {
+      this.symbolTable.define(name, type, kind);
+    }
+    this.writeIdentifier(name, isDefined);
+    this.jackTokenizer.advance();
+  }
+
   checkToken(type) {
     const token = this.jackTokenizer.currentToken;
     const tokenType = this.jackTokenizer.tokenType();
@@ -109,12 +126,15 @@ class CompilationEngine {
   compileClassVarDec() {
     this.writeElementStart('classVarDec');
 
+    const kind = this.jackTokenizer.currentToken;
     this.compileKeyword([KEYWORDS.STATIC, KEYWORDS.FIELD]);
+    const type = this.jackTokenizer.currentToken;
     this.compileType();
-    this.compileIdentifier();
+    this.compileVarName(true, type, kind);
+
     while (this.jackTokenizer.currentToken !== SYMBOLS.SEMI_COLON) {
       this.compileSymbol([SYMBOLS.COMMA]);
-      this.compileIdentifier();
+      this.compileVarName(true, type, kind);
     }
     this.compileSymbol([SYMBOLS.SEMI_COLON]);
 
@@ -130,6 +150,7 @@ class CompilationEngine {
   }
 
   compileSubroutine() {
+    this.symbolTable.startSubroutine();
     this.writeElementStart('subroutineDec');
 
     this.compileKeyword([KEYWORDS.CONSTRUCTOR, KEYWORDS.FUNCTION, KEYWORDS.METHOD]);
@@ -151,13 +172,15 @@ class CompilationEngine {
     this.writeElementStart('parameterList');
 
     while ([KEYWORDS.INT, KEYWORDS.CHAR, KEYWORDS.BOOLEAN].includes(this.jackTokenizer.currentToken) || this.jackTokenizer.tokenType() === TOKEN_TYPE.IDENTIFIER) {
+      const type = this.jackTokenizer.currentToken;
       this.compileType();
-      this.compileIdentifier();
+      this.compileVarName(true, type, KIND.ARGUMENT);
 
       while (this.jackTokenizer.currentToken === SYMBOLS.COMMA) {
         this.compileSymbol([SYMBOLS.COMMA]);
+        const type = this.jackTokenizer.currentToken;
         this.compileType();
-        this.compileIdentifier();
+        this.compileVarName(true, type, KIND.ARGUMENT);
       }
     }
 
@@ -181,11 +204,13 @@ class CompilationEngine {
     this.writeElementStart('varDec');
 
     this.compileKeyword([KEYWORDS.VAR]);
+    const type = this.jackTokenizer.currentToken;
     this.compileType();
-    this.compileIdentifier();
+    this.compileVarName(true, type, KIND.VAR);
+
     while (this.jackTokenizer.currentToken === SYMBOLS.COMMA) {
       this.compileSymbol([SYMBOLS.COMMA]);
-      this.compileIdentifier();
+      this.compileVarName(true, type, KIND.VAR);
     }
     this.compileSymbol([SYMBOLS.SEMI_COLON]);
 
@@ -228,7 +253,7 @@ class CompilationEngine {
     this.writeElementStart('letStatement');
 
     this.compileKeyword([KEYWORDS.LET]);
-    this.compileIdentifier();
+    this.compileVarName(false);
     while (this.jackTokenizer.currentToken !== SYMBOLS.EQUAL) {
       this.compileSymbol([SYMBOLS.LEFT_SQUARE_BRACKET]);
       this.compileExpression();
@@ -337,7 +362,12 @@ class CompilationEngine {
     } else if ([KEYWORDS.TRUE, KEYWORDS.FALSE, KEYWORDS.NULL, KEYWORDS.THIS].includes(this.jackTokenizer.currentToken)) {
       this.compileKeyword([KEYWORDS.TRUE, KEYWORDS.FALSE, KEYWORDS.NULL, KEYWORDS.THIS]);
     } else if (this.jackTokenizer.tokenType() === TOKEN_TYPE.IDENTIFIER) {
-      this.compileIdentifier();
+      const name = this.jackTokenizer.tokenType();
+      if (this.symbolTable.kindOf(name) !== KIND.NONE) {
+        this.compileVarName(false);
+      } else {
+        this.compileIdentifier();
+      }
       if (this.jackTokenizer.currentToken === SYMBOLS.LEFT_SQUARE_BRACKET) {
         this.compileSymbol([SYMBOLS.LEFT_SQUARE_BRACKET]);
         this.compileExpression();

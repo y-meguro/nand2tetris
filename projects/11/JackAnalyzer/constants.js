@@ -52,8 +52,17 @@ const SYMBOLS = {
   TILDE: '~'
 };
 
+const KIND = {
+  STATIC: 'static',
+  FIELD: 'field',
+  ARGUMENT: 'argument',
+  VAR: 'var',
+  NONE: 'none'
+};
+
 module.exports = {
   TOKEN_TYPE,
   KEYWORDS,
   SYMBOLS,
+  KIND,
 }
