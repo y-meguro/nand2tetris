@@ -1,5 +1,4 @@
 function Main.main 1
-push local 0
 push constant 8001
 push constant 16
 push constant 1
@@ -12,12 +11,9 @@ pop local 0
 push local 0
 call Main.convert 1
 pop temp 0
+push constant 0
 return
-push argument 0
 function Main.convert 3
-push local 0
-push local 1
-push local 2
 push constant 1
 neg
 pop local 2
@@ -68,8 +64,8 @@ pop local 2
 label IF_END_1
 goto WHILE_LOOP_0
 label WHILE_END_0
+push constant 0
 return
-push argument 0
 function Main.nextMask 0
 push argument 0
 push constant 0
@@ -85,9 +81,6 @@ push constant 2
 call Math.multiply 2
 return
 label IF_END_3
-push argument 0
-push argument 1
-push argument 2
 function Main.fillMemory 0
 label WHILE_LOOP_4
 push argument 1
@@ -109,4 +102,5 @@ add
 pop argument 0
 goto WHILE_LOOP_4
 label WHILE_END_4
+push constant 0
 return

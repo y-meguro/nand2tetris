@@ -1,5 +1,3 @@
-push this 0
-push this 1
 function SquareGame.new 0
 push constant 2
 call Memory.alloc 1
@@ -22,6 +20,7 @@ pop temp 0
 push pointer 0
 call Memory.deAlloc 1
 pop temp 0
+push constant 0
 return
 function SquareGame.moveSquare 0
 push argument 0
@@ -73,12 +72,11 @@ label IF_END_3
 push constant 5
 call Sys.wait 1
 pop temp 0
+push constant 0
 return
 function SquareGame.run 2
 push argument 0
 pop pointer 0
-push local 0
-push local 1
 push constant 0
 pop local 1
 label WHILE_LOOP_4
@@ -188,4 +186,5 @@ goto WHILE_LOOP_13
 label WHILE_END_13
 goto WHILE_LOOP_4
 label WHILE_END_4
+push constant 0
 return

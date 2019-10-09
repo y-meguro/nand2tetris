@@ -96,7 +96,7 @@
       <statements>
         <doStatement>
           <keyword> do </keyword>
-          <identifier> square </identifier>
+          <identifier> square </identifier> isDefined: false, type: Square, kind: field, index: 0
           <symbol> . </symbol>
           <identifier> dispose </identifier>
           <symbol> ( </symbol>
@@ -157,7 +157,7 @@
           <statements>
             <doStatement>
               <keyword> do </keyword>
-              <identifier> square </identifier>
+              <identifier> square </identifier> isDefined: false, type: Square, kind: field, index: 0
               <symbol> . </symbol>
               <identifier> moveUp </identifier>
               <symbol> ( </symbol>
@@ -186,7 +186,7 @@
           <statements>
             <doStatement>
               <keyword> do </keyword>
-              <identifier> square </identifier>
+              <identifier> square </identifier> isDefined: false, type: Square, kind: field, index: 0
               <symbol> . </symbol>
               <identifier> moveDown </identifier>
               <symbol> ( </symbol>
@@ -215,7 +215,7 @@
           <statements>
             <doStatement>
               <keyword> do </keyword>
-              <identifier> square </identifier>
+              <identifier> square </identifier> isDefined: false, type: Square, kind: field, index: 0
               <symbol> . </symbol>
               <identifier> moveLeft </identifier>
               <symbol> ( </symbol>
@@ -244,7 +244,7 @@
           <statements>
             <doStatement>
               <keyword> do </keyword>
-              <identifier> square </identifier>
+              <identifier> square </identifier> isDefined: false, type: Square, kind: field, index: 0
               <symbol> . </symbol>
               <identifier> moveRight </identifier>
               <symbol> ( </symbol>
@@ -418,7 +418,7 @@
               <statements>
                 <doStatement>
                   <keyword> do </keyword>
-                  <identifier> square </identifier>
+                  <identifier> square </identifier> isDefined: false, type: Square, kind: field, index: 0
                   <symbol> . </symbol>
                   <identifier> decSize </identifier>
                   <symbol> ( </symbol>
@@ -447,7 +447,7 @@
               <statements>
                 <doStatement>
                   <keyword> do </keyword>
-                  <identifier> square </identifier>
+                  <identifier> square </identifier> isDefined: false, type: Square, kind: field, index: 0
                   <symbol> . </symbol>
                   <identifier> incSize </identifier>
                   <symbol> ( </symbol>

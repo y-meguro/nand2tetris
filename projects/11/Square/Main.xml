@@ -38,7 +38,7 @@
         </letStatement>
         <doStatement>
           <keyword> do </keyword>
-          <identifier> game </identifier>
+          <identifier> game </identifier> isDefined: false, type: SquareGame, kind: var, index: 0
           <symbol> . </symbol>
           <identifier> run </identifier>
           <symbol> ( </symbol>
@@ -49,7 +49,7 @@
         </doStatement>
         <doStatement>
           <keyword> do </keyword>
-          <identifier> game </identifier>
+          <identifier> game </identifier> isDefined: false, type: SquareGame, kind: var, index: 0
           <symbol> . </symbol>
           <identifier> dispose </identifier>
           <symbol> ( </symbol>
