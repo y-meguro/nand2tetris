@@ -93,7 +93,17 @@ class CompilationEngine {
 
   compileStringConstant() {
     this.checkToken(TOKEN_TYPE.STRING_CONST);
-    this.writeElement('stringConstant', this.jackTokenizer.stringVal());
+    const stringVal = this.jackTokenizer.stringVal();
+    this.writeElement('stringConstant', stringVal);
+    this.vmWriter.writePush(SEGMENT.CONST, stringVal.length);
+    this.vmWriter.writeCall('String.new', 1);
+
+    for (let i = 0; i < stringVal.length; i++) {
+      this.vmWriter.writePush(SEGMENT.CONST, stringVal.charCodeAt(i));
+      this.vmWriter.writeCall('String.appendChar', 2);
+    }
+
+
     this.jackTokenizer.advance();
   }
 
@@ -103,31 +113,31 @@ class CompilationEngine {
     this.jackTokenizer.advance();
   }
 
-  compileVarName(isDefined, type=null, kind=null, shouldWritePush=true) {
+  compileVarName(isDefined, type=null, kind=null, shouldWritePush=false) {
     this.checkToken(TOKEN_TYPE.IDENTIFIER);
     const name = this.jackTokenizer.identifier();
-    if (isDefined) {
+    if (isDefined) { // classVarDec, parameterList, varDec
       this.symbolTable.define(name, type, kind);
-    }
-    this.writeIdentifier(name, isDefined);
+    } else if (shouldWritePush) { // term
+      kind = this.symbolTable.kindOf(name);
+      const index = this.symbolTable.indexOf(name);
 
-    kind = this.symbolTable.kindOf(name);
-    const index = this.symbolTable.indexOf(name);
-
-    if (shouldWritePush) {
-      let segment = '';
-      if (kind === KIND.STATIC) {
-        segment = SEGMENT.STATIC;
-      } else if (kind === KIND.FIELD) {
-        segment = SEGMENT.THIS;
-      } else if (kind === KIND.ARGUMENT) {
-        segment = SEGMENT.ARGUMENT;
-      } else if (kind === KIND.VAR) {
-        segment = SEGMENT.LOCAL;
+      if (shouldWritePush) {
+        let segment = '';
+        if (kind === KIND.STATIC) {
+          segment = SEGMENT.STATIC;
+        } else if (kind === KIND.FIELD) {
+          segment = SEGMENT.THIS;
+        } else if (kind === KIND.ARGUMENT) {
+          segment = SEGMENT.ARGUMENT;
+        } else if (kind === KIND.VAR) {
+          segment = SEGMENT.LOCAL;
+        }
+        this.vmWriter.writePush(segment, index);
       }
-      this.vmWriter.writePush(segment, index);
-    }
+    } // else: subroutineCall, compileLet
 
+    this.writeIdentifier(name, isDefined);
     this.jackTokenizer.advance();
   }
 
@@ -240,11 +250,11 @@ class CompilationEngine {
     }
     let nLocals = 0;
     while (this.jackTokenizer.currentToken === KEYWORDS.VAR) {
-      nLocals = nLocals + 1;
       const varNum = this.compileVarDec();
       nLocals = nLocals + varNum;
     }
 
+    // update function's nLocals
     if (nLocals !== 0) {
       const fileContent = fs.readFileSync(this.outputFilePathForVM, {encoding: "utf-8"});
       const newContent = fileContent.replace(`${functionName} 0`, `${functionName} ${nLocals}`);
@@ -265,7 +275,7 @@ class CompilationEngine {
     this.compileType();
     this.compileVarName(true, type, KIND.VAR);
 
-    let varNum = 0;
+    let varNum = 1;
     while (this.jackTokenizer.currentToken === SYMBOLS.COMMA) {
       varNum = varNum + 1;
       this.compileSymbol([SYMBOLS.COMMA]);
@@ -315,27 +325,47 @@ class CompilationEngine {
 
     this.compileKeyword([KEYWORDS.LET]);
     const name = this.jackTokenizer.currentToken;
-    this.compileVarName(false, null, null, false);
-    while (this.jackTokenizer.currentToken !== SYMBOLS.EQUAL) {
-      this.compileSymbol([SYMBOLS.LEFT_SQUARE_BRACKET]);
-      this.compileExpression();
-      this.compileSymbol([SYMBOLS.RIGHT_SQUARE_BRACKET]);
-    }
-    this.compileSymbol([SYMBOLS.EQUAL]);
-    this.compileExpression();
-    this.compileSymbol([SYMBOLS.SEMI_COLON]);
-
+    this.compileVarName(false);
     const kind = this.symbolTable.kindOf(name);
     const index = this.symbolTable.indexOf(name);
-    if (kind === KIND.STATIC) {
-      this.vmWriter.writePop(SEGMENT.STATIC, index);
-    } else if (kind === KIND.FIELD) {
-      this.vmWriter.writePop(SEGMENT.THIS, index);
-    } else if (kind === KIND.ARGUMENT) {
-      this.vmWriter.writePop(SEGMENT.ARGUMENT, index);
-    } else if (kind === KIND.VAR) {
-      this.vmWriter.writePop(SEGMENT.LOCAL, index);
+
+    if (this.jackTokenizer.currentToken !== SYMBOLS.EQUAL) { // varName[]
+      this.compileSymbol([SYMBOLS.LEFT_SQUARE_BRACKET]);
+      this.compileExpression(); // push i
+      this.compileSymbol([SYMBOLS.RIGHT_SQUARE_BRACKET]);
+
+      if (kind === KIND.STATIC) {
+        this.vmWriter.writePush(SEGMENT.STATIC, index);
+      } else if (kind === KIND.FIELD) {
+        this.vmWriter.writePush(SEGMENT.THIS, index);
+      } else if (kind === KIND.ARGUMENT) {
+        this.vmWriter.writePush(SEGMENT.ARGUMENT, index);
+      } else if (kind === KIND.VAR) {
+        this.vmWriter.writePush(SEGMENT.LOCAL, index);
+      }
+      this.vmWriter.writeArithmetic(COMMAND.ADD);
+
+      this.compileSymbol([SYMBOLS.EQUAL]);
+      this.compileExpression();
+      this.vmWriter.writePop(SEGMENT.TEMP, 0);
+      this.vmWriter.writePop(SEGMENT.POINTER, 1);
+      this.vmWriter.writePush(SEGMENT.TEMP, 0);
+      this.vmWriter.writePop(SEGMENT.THAT, 0);
+    } else { // varName
+      this.compileSymbol([SYMBOLS.EQUAL]);
+      this.compileExpression();
+      if (kind === KIND.STATIC) {
+        this.vmWriter.writePop(SEGMENT.STATIC, index);
+      } else if (kind === KIND.FIELD) {
+        this.vmWriter.writePop(SEGMENT.THIS, index);
+      } else if (kind === KIND.ARGUMENT) {
+        this.vmWriter.writePop(SEGMENT.ARGUMENT, index);
+      } else if (kind === KIND.VAR) {
+        this.vmWriter.writePop(SEGMENT.LOCAL, index);
+      }
     }
+
+    this.compileSymbol([SYMBOLS.SEMI_COLON]);
 
     this.writeElementEnd('letStatement');
   }
@@ -367,8 +397,10 @@ class CompilationEngine {
     this.writeElementStart('returnStatement');
 
     this.compileKeyword([KEYWORDS.RETURN]);
-    while (this.jackTokenizer.currentToken !== SYMBOLS.SEMI_COLON) {
+    if (this.jackTokenizer.currentToken !== SYMBOLS.SEMI_COLON) { // return expression;
       this.compileExpression();
+    } else { // return;
+      this.vmWriter.writePush(SEGMENT.CONST, 0);
     }
     this.compileSymbol([SYMBOLS.SEMI_COLON]);
 
@@ -411,8 +443,7 @@ class CompilationEngine {
     let nArgs = 0;
 
     const kind = this.symbolTable.kindOf(name);
-    if (kind !== KIND.NONE) {
-      // pattern1: varName.subroutineName
+    if (kind !== KIND.NONE) { // pattern1: varName.subroutineName
       const type = this.symbolTable.typeOf(name);
       const index = this.symbolTable.indexOf(name);
       nArgs = nArgs + 1;
@@ -427,20 +458,18 @@ class CompilationEngine {
         this.vmWriter.writePush(SEGMENT.LOCAL, index);
       }
 
-      this.compileIdentifier();
+      this.compileVarName(false);
       this.compileSymbol([SYMBOLS.PERIOD]);
       name = type + '.' + this.jackTokenizer.currentToken;
       this.compileIdentifier();
 
     } else {
       this.compileIdentifier();
-      if (this.jackTokenizer.currentToken === SYMBOLS.PERIOD) {
-        // pattern2: className.subroutineName
+      if (this.jackTokenizer.currentToken === SYMBOLS.PERIOD) { // pattern2: className.subroutineName
         this.compileSymbol([SYMBOLS.PERIOD]);
         name = name + '.' + this.jackTokenizer.currentToken;
         this.compileIdentifier();
-      } else {
-        // pattern3: subroutineName
+      } else { // pattern3: subroutineName
         this.vmWriter.writePush(SEGMENT.POINTER, 0);
         name = this.className + '.' + name;
         nArgs = nArgs + 1;
@@ -530,7 +559,7 @@ class CompilationEngine {
     } else if (this.jackTokenizer.tokenType() === TOKEN_TYPE.IDENTIFIER) {
       let name = this.jackTokenizer.currentToken;
       if (this.symbolTable.kindOf(name) !== KIND.NONE) {
-        this.compileVarName(false);
+        this.compileVarName(false, null, null, true);
       } else {
         this.compileIdentifier();
       }
@@ -538,6 +567,9 @@ class CompilationEngine {
         this.compileSymbol([SYMBOLS.LEFT_SQUARE_BRACKET]);
         this.compileExpression();
         this.compileSymbol([SYMBOLS.RIGHT_SQUARE_BRACKET]);
+        this.vmWriter.writeArithmetic(COMMAND.ADD);
+        this.vmWriter.writePop(SEGMENT.POINTER, 1);
+        this.vmWriter.writePush(SEGMENT.THAT, 0);
       } else if (this.jackTokenizer.currentToken === SYMBOLS.LEFT_ROUND_BRACKET) {
         this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
         const nArgs = this.compileExpressionList();
