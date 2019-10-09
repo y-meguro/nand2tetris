@@ -229,8 +229,14 @@ class CompilationEngine {
 
     this.compileSymbol([SYMBOLS.LEFT_CURLY_BRACKET]);
 
-    if (subroutineKeyword === KEYWORDS.FUNCTION) {
-      this.vmWriter.writeFunction(functionName, 0);
+    this.vmWriter.writeFunction(functionName, 0);
+    if (subroutineKeyword === KEYWORDS.CONSTRUCTOR) {
+      this.vmWriter.writePush(SEGMENT.CONST, this.symbolTable.varCount(KIND.FIELD));
+      this.vmWriter.writeCall('Memory.alloc', 1);
+      this.vmWriter.writePop(SEGMENT.POINTER, 0);
+    } else if (subroutineKeyword === KEYWORDS.METHOD) {
+      this.vmWriter.writePush(SEGMENT.ARGUMENT, 0);
+      this.vmWriter.writePop(SEGMENT.POINTER, 0);
     }
     let nLocals = 0;
     while (this.jackTokenizer.currentToken === KEYWORDS.VAR) {
@@ -239,7 +245,7 @@ class CompilationEngine {
       nLocals = nLocals + varNum;
     }
 
-    if (subroutineKeyword === KEYWORDS.FUNCTION && nLocals !== 0) {
+    if (nLocals !== 0) {
       const fileContent = fs.readFileSync(this.outputFilePathForVM, {encoding: "utf-8"});
       const newContent = fileContent.replace(`${functionName} 0`, `${functionName} ${nLocals}`);
       fs.writeFileSync(this.outputFilePathForVM, newContent);
@@ -402,15 +408,47 @@ class CompilationEngine {
 
   compileSubroutineCall() {
     let name = this.jackTokenizer.currentToken;
-    this.compileIdentifier();
-    if (this.jackTokenizer.currentToken === SYMBOLS.PERIOD) {
-      this.compileSymbol([SYMBOLS.PERIOD]);
-      name = name + '.' + this.jackTokenizer.currentToken;
+    let nArgs = 0;
+
+    const kind = this.symbolTable.kindOf(name);
+    if (kind !== KIND.NONE) {
+      // pattern1: varName.subroutineName
+      const type = this.symbolTable.typeOf(name);
+      const index = this.symbolTable.indexOf(name);
+      nArgs = nArgs + 1;
+
+      if (kind === KIND.STATIC) {
+        this.vmWriter.writePush(SEGMENT.STATIC, index);
+      } else if (kind === KIND.FIELD) {
+        this.vmWriter.writePush(SEGMENT.THIS, index);
+      } else if (kind === KIND.ARGUMENT) {
+        this.vmWriter.writePush(SEGMENT.ARGUMENT, index);
+      } else if (kind === KIND.VAR) {
+        this.vmWriter.writePush(SEGMENT.LOCAL, index);
+      }
+
       this.compileIdentifier();
+      this.compileSymbol([SYMBOLS.PERIOD]);
+      name = type + '.' + this.jackTokenizer.currentToken;
+      this.compileIdentifier();
+
+    } else {
+      this.compileIdentifier();
+      if (this.jackTokenizer.currentToken === SYMBOLS.PERIOD) {
+        // pattern2: className.subroutineName
+        this.compileSymbol([SYMBOLS.PERIOD]);
+        name = name + '.' + this.jackTokenizer.currentToken;
+        this.compileIdentifier();
+      } else {
+        // pattern3: subroutineName
+        this.vmWriter.writePush(SEGMENT.POINTER, 0);
+        name = this.className + '.' + name;
+        nArgs = nArgs + 1;
+      }
     }
 
     this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
-    const nArgs = this.compileExpressionList();
+    nArgs = nArgs + this.compileExpressionList();
     this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
 
     this.vmWriter.writeCall(name, nArgs);
