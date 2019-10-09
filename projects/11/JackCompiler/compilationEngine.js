@@ -197,6 +197,9 @@ class CompilationEngine {
     this.writeElementStart('subroutineDec');
 
     const subroutineKeyword = this.jackTokenizer.currentToken;
+    if (subroutineKeyword === KEYWORDS.METHOD) {
+      this.symbolTable.define('this', this.className, SEGMENT.ARGUMENT);
+    }
     this.compileKeyword([KEYWORDS.CONSTRUCTOR, KEYWORDS.FUNCTION, KEYWORDS.METHOD]);
     if (this.jackTokenizer.currentToken === KEYWORDS.VOID) {
       this.compileKeyword([KEYWORDS.VOID]);
@@ -576,10 +579,15 @@ class CompilationEngine {
         this.vmWriter.writeCall(name, nArgs);
       } else if (this.jackTokenizer.currentToken === SYMBOLS.PERIOD) {
         this.compileSymbol([SYMBOLS.PERIOD]);
+        let nArgs = 0;
+        if (this.symbolTable.kindOf(name) !== KIND.NONE) {
+          name = this.symbolTable.typeOf(name);
+          nArgs = 1;
+        }
         name = name + '.' + this.jackTokenizer.currentToken;
         this.compileIdentifier();
         this.compileSymbol([SYMBOLS.LEFT_ROUND_BRACKET]);
-        const nArgs = this.compileExpressionList();
+        nArgs = nArgs + this.compileExpressionList();
         this.compileSymbol([SYMBOLS.RIGHT_ROUND_BRACKET]);
         this.vmWriter.writeCall(name, nArgs);
       }
