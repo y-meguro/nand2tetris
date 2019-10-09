@@ -103,7 +103,6 @@ class CompilationEngine {
       this.vmWriter.writeCall('String.appendChar', 2);
     }
 
-
     this.jackTokenizer.advance();
   }
 
