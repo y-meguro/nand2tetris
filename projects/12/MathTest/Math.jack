@@ -44,6 +44,10 @@ class Math {
         return ~((x & twoToThe[j]) = 0);
     }
 
+    function int twoToThe(int i) {
+        return twoToThe[i];
+    }
+
     /** Returns the product of x and y. 
      *  When a Jack compiler detects the multiplication operator '*' in the 
      *  program's code, it handles it by invoking this method. In other words,
@@ -104,7 +108,7 @@ class Math {
         while (~(j < 0)) {
             let temp = y + twoToThe[j];
             let temp2 = temp * temp;
-            if (~(temp2 > x) & temp2 > 0) {
+            if (~(temp2 > x) & (temp2 > 0)) {
                 let y = temp;
             }
             let j = j - 1;
